@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import Sidebar from "@/components/Sidebar";
 
 export default function DashboardLayout({
   children,
@@ -80,9 +79,6 @@ export default function DashboardLayout({
   // Jika lolos, render Sidebar dan konten halamannya
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
-      {/* Sekarang Sidebar menerima role yang dinamis dan ASLI dari database */}
-      <Sidebar role={role!} />
-      
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>

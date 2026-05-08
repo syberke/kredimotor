@@ -1,77 +1,176 @@
-"use client";
+import {
+  Users,
+  Bike,
+  CreditCard,
+  AlertTriangle,
+  Wallet,
+  ClipboardList,
+} from "lucide-react";
 
-import { Users, Bike, Settings, PlusCircle, Activity } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
-export default function AdminDashboard() {
+async function getDashboardData() {
+  const [
+    pengajuan,
+    kreditAktif,
+    kreditLunas,
+    kreditMacet,
+    motor,
+    pelanggan,
+    angsuran,
+  ] = await Promise.all([
+    supabase
+      .from("pengajuan_kredit")
+      .select("*", { count: "exact", head: true }),
+
+    supabase
+      .from("kredit")
+      .select("*", { count: "exact", head: true })
+      .eq("status_kredit", "Dicicil"),
+
+    supabase
+      .from("kredit")
+      .select("*", { count: "exact", head: true })
+      .eq("status_kredit", "Lunas"),
+
+    supabase
+      .from("kredit")
+      .select("*", { count: "exact", head: true })
+      .eq("status_kredit", "Macet"),
+
+    supabase
+      .from("motor")
+      .select("*", { count: "exact", head: true }),
+
+    supabase
+      .from("pelanggan")
+      .select("*", { count: "exact", head: true }),
+
+    supabase
+      .from("angsuran")
+      .select("total_bayar"),
+  ]);
+
+  const totalAngsuran =
+    angsuran.data?.reduce(
+      (acc, item) => acc + (item.total_bayar || 0),
+      0
+    ) || 0;
+
+  return {
+    totalPengajuan: pengajuan.count || 0,
+    totalKreditAktif: kreditAktif.count || 0,
+    totalKreditLunas: kreditLunas.count || 0,
+    totalKreditMacet: kreditMacet.count || 0,
+    totalMotor: motor.count || 0,
+    totalPelanggan: pelanggan.count || 0,
+    totalAngsuran,
+  };
+}
+
+export default async function AdminDashboard() {
+  const stats = await getDashboardData();
+
+  const cards = [
+    {
+      title: "Total Pengajuan",
+      value: stats.totalPengajuan,
+      icon: ClipboardList,
+      color: "blue",
+    },
+    {
+      title: "Kredit Aktif",
+      value: stats.totalKreditAktif,
+      icon: CreditCard,
+      color: "emerald",
+    },
+    {
+      title: "Kredit Lunas",
+      value: stats.totalKreditLunas,
+      icon: Wallet,
+      color: "green",
+    },
+    {
+      title: "Kredit Macet",
+      value: stats.totalKreditMacet,
+      icon: AlertTriangle,
+      color: "red",
+    },
+    {
+      title: "Total Motor",
+      value: stats.totalMotor,
+      icon: Bike,
+      color: "purple",
+    },
+    {
+      title: "Total Pelanggan",
+      value: stats.totalPelanggan,
+      icon: Users,
+      color: "orange",
+    },
+  ];
+
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Sistem Administrator</h1>
-          <p className="text-slate-500 text-sm mt-1">Kelola data master dan staff S-LOG.</p>
-        </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all shadow-lg shadow-blue-200 flex items-center gap-2">
-          <PlusCircle size={18} />
-          Tambah Staff
-        </button>
-      </div>
-      
-      {/* Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center shrink-0">
-            <Users size={28} />
-          </div>
-          <div>
-            <p className="text-slate-500 text-sm font-medium">Total Staff Aktif</p>
-            <h3 className="text-2xl font-bold text-slate-800">12 Orang</h3>
-          </div>
-        </div>
-        
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-14 h-14 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center shrink-0">
-            <Bike size={28} />
-          </div>
-          <div>
-            <p className="text-slate-500 text-sm font-medium">Katalog Motor</p>
-            <h3 className="text-2xl font-bold text-slate-800">45 Tipe</h3>
-          </div>
-        </div>
+    <div className="p-8 bg-slate-50 min-h-screen">
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center shrink-0">
-            <Settings size={28} />
-          </div>
-          <div>
-            <p className="text-slate-500 text-sm font-medium">Metode Pembayaran</p>
-            <h3 className="text-2xl font-bold text-slate-800">8 Bank/Instansi</h3>
-          </div>
-        </div>
+      {/* HEADER */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-black text-slate-800">
+          Dashboard Admin
+        </h1>
+
+        <p className="text-slate-500 mt-1">
+          Monitoring sistem kredit motor
+        </p>
       </div>
 
-      {/* Log Aktivitas Terakhir */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-          <Activity size={20} className="text-blue-500" />
-          Aktivitas Sistem Terakhir
+      {/* GRID CARD */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+
+        {cards.map((card, index) => {
+          const Icon = card.icon;
+
+          return (
+            <div
+              key={index}
+              className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition"
+            >
+              <div className="flex items-center justify-between mb-4">
+
+                <div
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center
+                  bg-${card.color}-50 text-${card.color}-600`}
+                >
+                  <Icon size={28} />
+                </div>
+
+              </div>
+
+              <p className="text-slate-500 text-sm">
+                {card.title}
+              </p>
+
+              <h2 className="text-3xl font-black text-slate-800 mt-2">
+                {card.value}
+              </h2>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* TOTAL PEMBAYARAN */}
+      <div className="bg-gradient-to-r from-blue-600 to-emerald-500 rounded-3xl p-8 text-white shadow-xl">
+
+        <p className="text-sm opacity-80 mb-2">
+          Total Angsuran Masuk
+        </p>
+
+        <h2 className="text-4xl font-black">
+          Rp {stats.totalAngsuran.toLocaleString("id-ID")}
         </h2>
-        <div className="space-y-4">
-          <div className="flex justify-between items-center pb-4 border-b border-slate-50">
-            <div>
-              <p className="text-sm font-medium text-slate-700">Budi (Marketing) menambahkan motor baru</p>
-              <p className="text-xs text-slate-400">Yamaha NMAX 2024</p>
-            </div>
-            <span className="text-xs text-slate-400">10 mnt lalu</span>
-          </div>
-          <div className="flex justify-between items-center pb-4 border-b border-slate-50">
-            <div>
-              <p className="text-sm font-medium text-slate-700">Sistem mengupdate stok otomatis</p>
-              <p className="text-xs text-slate-400">Honda Vario 160</p>
-            </div>
-            <span className="text-xs text-slate-400">1 jam lalu</span>
-          </div>
-        </div>
+
       </div>
+
     </div>
   );
 }
