@@ -1,6 +1,6 @@
-import CeoSidebar from "@/components/shared/CeoSideBar";
+import MarketingSidebar from "@/components/shared/MarketingSideBar";
 
-export default function CeoLayout({
+export default function MarketingLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -12,7 +12,7 @@ export default function CeoLayout({
       bg-slate-50
     ">
 
-      <CeoSidebar />
+      <MarketingSidebar />
 
       <main className="
         flex-1
