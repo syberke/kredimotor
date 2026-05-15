@@ -1,12 +1,16 @@
 // src/components/kredit/KreditTable.tsx
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Kredit, StatusKredit } from "@/types/kredit.types";
 import KreditStatusBadge from "./KreditStatusBadge";
-import { Search, Download, MoreVertical, Eye, Edit, Trash2, ChevronLeft, ChevronRight, X, CreditCard, Copy, Check } from "lucide-react";
+import { 
+  Search, Download, MoreVertical, Eye, Edit, Trash2, 
+  ChevronLeft, ChevronRight, X, CreditCard, Copy, Check, 
+  AlertCircle, Loader2, ChevronDown, CheckCircle2
+} from "lucide-react";
 
 type Props = {
   data: Kredit[];
@@ -16,24 +20,55 @@ type Props = {
 const ITEMS_PER_PAGE = 10;
 const PLACEHOLDER_IMG = "https://via.placeholder.com/60?text=Motor";
 
+const STATUS_OPTIONS: { value: StatusKredit | "all"; label: string; icon: string; color: string }[] = [
+  { value: "all", label: "Semua Status", icon: "", color: "text-slate-600" },
+  { value: "Dicicil", label: "Dicicil", icon: "🔄", color: "text-blue-600" },
+  { value: "Lunas", label: "Lunas", icon: "✅", color: "text-emerald-600" },
+  { value: "Macet", label: "Macet", icon: "⚠️", color: "text-red-600" },
+];
+
 export default function KreditTable({ data, isLoading = false }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusKredit | "all">("all");
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const [dropdown, setDropdown] = useState<number | null>(null);
+  const [actionDropdown, setActionDropdown] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const toastTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Close dropdown on outside click
+  const showToast = useCallback((type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
+  }, []);
+
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setDropdown(null);
+    return () => { if (toastTimer.current) clearTimeout(toastTimer.current); };
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target as Node)) {
+        setStatusDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setStatusDropdownOpen(false);
+        setActionDropdown(null);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   const filtered = useMemo(() => {
@@ -77,37 +112,74 @@ export default function KreditTable({ data, isLoading = false }: Props) {
     a.download = `kredit-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    showToast("success", "✅ Data berhasil diexport!");
   };
 
   const reset = () => { setSearch(""); setStatus("all"); setPage(1); };
 
-  const handleViewDetail = (id: number) => router.push(`/kredit/${id}`);
-  const handleEdit = (id: number) => router.push(`/kredit/${id}/edit`);
-  const handleBayarCicilan = (id: number) => router.push(`/kredit/${id}/bayar`);
+  const handleViewDetail = (id: number) => {
+    router.push(`/admin/kredit/${id}`);
+    setActionDropdown(null);
+  };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("⚠️ Yakin ingin menghapus data kredit ini?")) return;
-    try {
-      const res = await fetch(`/api/kredit/${id}`, { method: "DELETE", cache: "no-store" });
-      if (res.ok) router.refresh();
-      else alert("❌ Gagal menghapus data");
-    } catch {
-      alert("❌ Terjadi kesalahan koneksi");
-    }
+  const handleEdit = (id: number) => {
+    router.push(`/admin/kredit/${id}/edit`);
+    setActionDropdown(null);
+  };
+
+  const handlePayment = (id: number) => {
+    router.push(`/admin/kredit/${id}/bayar`);
+    setActionDropdown(null);
   };
 
   const handleCopyId = async (id: number) => {
     await navigator.clipboard.writeText(String(id));
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+    showToast("success", "📋 ID berhasil disalin!");
+    setActionDropdown(null);
   };
 
+  const handleDelete = async (id: number) => {
+    if (!confirm("⚠️ Yakin ingin menghapus data kredit ini?\nTindakan ini tidak dapat dibatalkan.")) return;
+    
+    setDeleting(id);
+    try {
+      const res = await fetch(`/api/kredit/${id}`, { method: "DELETE", cache: "no-store" });
+      if (res.ok) {
+        router.refresh();
+        showToast("success", "🗑️ Data berhasil dihapus");
+      } else {
+        const err: { error?: string } = await res.json().catch(() => ({}));
+        showToast("error", `❌ Gagal: ${err.error || "Terjadi kesalahan"}`);
+      }
+    } catch {
+      showToast("error", "❌ Terjadi kesalahan koneksi");
+    } finally {
+      setDeleting(null);
+      setActionDropdown(null);
+    }
+  };
+
+  const currentStatusOption = STATUS_OPTIONS.find(opt => opt.value === status) || STATUS_OPTIONS[0];
+
   if (isLoading) {
-    return <div className="p-12 text-center text-slate-500">Memuat data...</div>;
+    return <div className="p-12 text-center text-slate-500 flex flex-col items-center gap-4">
+      <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+      <span>Memuat data...</span>
+    </div>;
   }
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-9999 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border backdrop-blur-md text-sm font-medium transition-all animate-in fade-in slide-in-from-top-2 ${toast.type === "success" ? "bg-emerald-50/90 border-emerald-200 text-emerald-800" : "bg-red-50/90 border-red-200 text-red-800"}`}>
+          {toast.type === "success" ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {toast.message}
+        </div>
+      )}
+
       {/* Header */}
       <div className="p-6 border-b border-slate-100">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -125,15 +197,38 @@ export default function KreditTable({ data, isLoading = false }: Props) {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Cari nama, email, motor..." className="pl-10 pr-4 py-2.5 w-64 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm" />
             </div>
-            <select value={status} onChange={(e) => { setStatus(e.target.value as StatusKredit | "all"); setPage(1); }} className="px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm bg-white">
-              <option value="all">Semua Status</option>
-              <option value="Dicicil">🔄 Dicicil</option>
-              <option value="Lunas">✅ Lunas</option>
-              <option value="Macet">⚠️ Macet</option>
-            </select>
+
+            <div className="relative" ref={statusDropdownRef}>
+              <button 
+                onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm transition min-w-35"
+              >
+                <span className={currentStatusOption.color}>{currentStatusOption.icon}</span>
+                <span className="text-slate-700 font-medium">{currentStatusOption.label}</span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${statusDropdownOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {statusDropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-full bg-white rounded-xl shadow-xl border border-slate-100 py-1.5 z-50 min-w-40">
+                  {STATUS_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => { setStatus(opt.value); setStatusDropdownOpen(false); setPage(1); }}
+                      className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition text-left ${status === opt.value ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700 hover:bg-slate-50"}`}
+                    >
+                      <span className={opt.color}>{opt.icon}</span>
+                      <span>{opt.label}</span>
+                      {status === opt.value && <CheckCircle2 className="w-4 h-4 ml-auto text-blue-600" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <button onClick={exportCsv} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm transition">
               <Download className="w-4 h-4" /> Export
             </button>
+
             {(search || status !== "all") && (
               <button onClick={reset} className="p-2.5 rounded-xl text-slate-500 hover:text-red-600 hover:bg-red-50 transition" title="Reset">
                 <X className="w-4 h-4" />
@@ -144,7 +239,7 @@ export default function KreditTable({ data, isLoading = false }: Props) {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" style={{ overflow: 'visible' }}>
         <table className="w-full">
           <thead className="bg-slate-50">
             <tr>
@@ -173,9 +268,10 @@ export default function KreditTable({ data, isLoading = false }: Props) {
                 const pelanggan = p?.pelanggan;
                 const motor = p?.motor;
                 const tenor = p?.jenis_cicilan?.lama_cicilan;
+                const isOpen = actionDropdown === item.id;
 
                 return (
-                  <tr key={item.id} className="hover:bg-slate-50 transition">
+                  <tr key={item.id} className="hover:bg-slate-50/80 transition group relative">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         {pelanggan?.foto ? (
@@ -216,37 +312,49 @@ export default function KreditTable({ data, isLoading = false }: Props) {
                       <p className={`font-bold ${item.sisa_kredit > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{fmt(item.sisa_kredit)}</p>
                     </td>
                     <td className="px-6 py-4"><KreditStatusBadge status={item.status_kredit} /></td>
-                    <td className="px-6 py-4">
-                      <div className="relative inline-block text-left" ref={dropdownRef}>
-                        <button onClick={() => setDropdown((d) => (d === item.id ? null : item.id))} className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500/20" aria-label="Menu aksi">
+                    <td className="px-6 py-4 relative">
+                      <div className="relative inline-block text-left">
+                        <button 
+                          onClick={() => setActionDropdown(isOpen ? null : item.id)}
+                          className={`p-2 rounded-xl transition focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${isOpen ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-700'}`}
+                          aria-label="Menu aksi"
+                        >
                           <MoreVertical className="w-4 h-4" />
                         </button>
-                        {dropdown === item.id && (
+
+                        {isOpen && (
                           <>
-                            <div className="fixed inset-0 z-30" onClick={() => setDropdown(null)} />
-                            <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-40">
-                              <div className="px-4 py-2 border-b border-slate-100">
-                                <p className="text-xs font-semibold text-slate-500 uppercase">Aksi</p>
-                                <p className="text-sm font-medium text-slate-800 truncate">#{item.id}</p>
+                            <div className="fixed inset-0 z-40" onClick={() => setActionDropdown(null)} />
+                            <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-slate-200/60 bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
+                              <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-100">
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Aksi Cepat</p>
+                                <p className="text-sm font-medium text-slate-800 truncate mt-0.5">ID #{item.id} • {pelanggan?.nama_pelanggan ?? "-"}</p>
                               </div>
-                              <button onClick={() => { handleViewDetail(item.id); setDropdown(null); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition text-left">
-                                <Eye className="w-4 h-4" /> Detail
-                              </button>
-                              {item.status_kredit !== 'Lunas' && (
-                                <button onClick={() => { handleBayarCicilan(item.id); setDropdown(null); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-emerald-700 hover:bg-emerald-50 transition text-left">
-                                  <CreditCard className="w-4 h-4" /> Bayar Cicilan
+                              <div className="py-1.5">
+                                <button onClick={() => handleViewDetail(item.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition">
+                                  <Eye className="w-4 h-4" /> Lihat Detail
                                 </button>
-                              )}
-                              <button onClick={() => { handleEdit(item.id); setDropdown(null); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition text-left">
-                                <Edit className="w-4 h-4" /> Edit
-                              </button>
-                              <button onClick={() => handleCopyId(item.id)} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition text-left">
-                                {copiedId === item.id ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                                {copiedId === item.id ? "Tersalin!" : "Salin ID"}
-                              </button>
-                              <hr className="my-2 border-slate-100" />
-                              <button onClick={() => { handleDelete(item.id); setDropdown(null); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition text-left">
-                                <Trash2 className="w-4 h-4" /> Hapus Permanen
+                                {item.status_kredit !== 'Lunas' && (
+                                  <button onClick={() => handlePayment(item.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-emerald-700 hover:bg-emerald-50 transition">
+                                    <CreditCard className="w-4 h-4" /> Bayar Cicilan
+                                  </button>
+                                )}
+                                <button onClick={() => handleEdit(item.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition">
+                                  <Edit className="w-4 h-4" /> Edit Data
+                                </button>
+                                <button onClick={() => handleCopyId(item.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition">
+                                  {copiedId === item.id ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                                  {copiedId === item.id ? "Tersalin!" : "Salin ID Kredit"}
+                                </button>
+                              </div>
+                              <hr className="border-slate-100" />
+                              <button
+                                onClick={() => handleDelete(item.id)}
+                                disabled={deleting === item.id}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {deleting === item.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                {deleting === item.id ? "Menghapus..." : "Hapus Permanen"}
                               </button>
                             </div>
                           </>

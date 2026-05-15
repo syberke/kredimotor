@@ -69,6 +69,26 @@ export interface KreditFormData {
   keterangan?: string;
 }
 
+
+export interface Angsuran {
+  id: number;
+  id_kredit: number;
+  tgl_bayar: string;
+  angsuran_ke: number;
+  total_bayar: number;
+  keterangan?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type UpdateKreditInput = {
+  status_kredit?: StatusKredit;
+  sisa_kredit?: number;
+  tgl_mulai_kredit?: string | null;
+  tgl_selesai_kredit?: string | null;
+  keterangan_status_kredit?: string | null;
+};
+
 export interface KreditOptions {
   pelanggan: Array<{ id: string; nama_pelanggan: string; email: string }>;
   motor: Array<{ id: number; nama_motor: string; harga_jual: number | null }>;

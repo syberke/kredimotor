@@ -1,18 +1,22 @@
 import "./globals.css";
+import { Toaster } from "sonner";
 
-export const metadata = {
-  title: "Kredit Motor",
-  description: "Aplikasi Kredit Motor Online",
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id">
-      <body className="bg-slate-100 text-slate-800">{children}</body>
+      <body>
+        {children}
+        <Toaster 
+          position="top-right"
+          toastOptions={{
+            classNames: {
+              success: "bg-emerald-500 text-white",
+              error: "bg-red-500 text-white",
+              info: "bg-blue-500 text-white",
+            },
+          }}
+        />
+      </body>
     </html>
   );
 }

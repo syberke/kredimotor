@@ -9,7 +9,7 @@ import {
   CalendarClock, UserCog, LogOut, ChevronDown, ChevronUp,
   Settings, Bell
 } from "lucide-react";
-
+import Image from "next/image";
 // 📦 Menu configuration
 type MenuRole = "admin" | "marketing" | "ceo" | "all";
 
@@ -64,15 +64,17 @@ export default function AdminSidebar({ userRole = "admin" }: { userRole?: MenuRo
     <aside className="w-72 h-screen bg-white border-r border-slate-200 flex flex-col">
       {/* Logo */}
       <div className="h-20 flex items-center px-6 border-b border-slate-100">
-        <Link href="/admin" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-blue-600 to-emerald-500 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">KM</span>
-          </div>
-          <h1 className="text-xl font-bold tracking-tight">
-            <span className="text-blue-600">Kredi</span>
-            <span className="text-emerald-500">Motor</span>
-          </h1>
-        </Link>
+       <Link href="/admin" className="flex items-center gap-3">
+  <Image
+    src="/logo_slog_nobg_side.png"
+    alt="KrediMotor Logo"
+    loading="eager"
+    width={450}
+    height={450}
+    className="object-contain"
+  />
+
+</Link>
       </div>
 
       {/* Notifications */}
@@ -127,7 +129,7 @@ export default function AdminSidebar({ userRole = "admin" }: { userRole?: MenuRo
       {/* User Profile & Logout */}
       <div className="p-4 border-t border-slate-100 space-y-3">
         <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-600 to-emerald-500 flex items-center justify-center text-white font-semibold text-sm">
+         <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-sm">
             A
           </div>
           <div className="flex-1 min-w-0">
